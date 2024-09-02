@@ -29,6 +29,11 @@ This project implements a Legal Contract Analysis Assistant using Chainlit, Lang
 2. Install dependencies: `pip install -r requirements.txt`
 3. Set up environment variables:
    - see `.env.example`
+4. Install the Guardrails Server and configure the Guardrails CLI (required)
+   You will need to get API key from https://www.guardrailsai.com/
+   - `guardrails configure`
+     Create a Guardrails config file
+   - `guardrails hub install hub://guardrails/detect_pii`
 
 ## Usage
 
