@@ -2,14 +2,11 @@ from src.config import llm, Config
 from src.tools import tools_list
 from src.helper import process_uploaded_pdf
 from src.prompt_template import prompt_template_contract, prompt_template_chat
-from src.guards import validate_unusual_prompt, validate_pii
+from src.guards import validate_input
 from src.evaluator import evaluate_res
 from langchain.agents import AgentExecutor
-from langchain.prompts import ChatPromptTemplate
 from langchain.schema.runnable.config import RunnableConfig
 from langchain_community.chat_message_histories import ChatMessageHistory
-from langchain_core.prompts import MessagesPlaceholder
-from langchain_core.messages import AIMessage, HumanMessage
 from langchain.agents.format_scratchpad.openai_tools import (
     format_to_openai_tool_messages,
 )
@@ -234,14 +231,12 @@ async def main(message: cl.Message):
     msg = cl.Message(content="")
     await msg.send()
 
-    # validate_unusual_prompt(message.content)
-    is_valid, validation_error = validate_pii(message.content)
+    is_valid, validation_error = validate_input(message.content)
     if not is_valid:
-        msg.content += (
-            f"The response contains PII, please try again. \n {validation_error}"
-        )
+        msg.content += f"The input contains prohibited content, please try again. \n {validation_error}"
         await msg.update()
         return
+
     response = await agent_executor.ainvoke(
         {"input": message.content, "chat_history": chat_history},
         config=RunnableConfig(callbacks=[cb, lcb], run_name="analyst"),
@@ -257,13 +252,11 @@ async def main(message: cl.Message):
 
     contexts = response.get("intermediate_steps", [])[0][1]
 
-    print(f"contexts: \n {contexts}")
     data = {
         "question": message.content,
         "answer": answer,
         "contexts": contexts,
     }
-    # @literal_client.step(type="run", name="ragas")
 
     @cl.step(type="run", name="ragas")
     def evaluate_response(data_):

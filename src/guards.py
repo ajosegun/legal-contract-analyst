@@ -1,6 +1,5 @@
-from guardrails import Guard
-from guardrails.hub import DetectPII
-from guardrails.hub import UnusualPrompt
+from guardrails import Guard, OnFailAction
+from guardrails.hub import DetectPII, UnusualPrompt, ToxicLanguage
 from openai import AzureOpenAI
 from src.config import Config
 
@@ -14,25 +13,31 @@ openai_client = AzureOpenAI(
 )
 
 
-def validate_unusual_prompt(the_prompt: str):
-    print("Validating unusual prompt")
-    guard = Guard().use(UnusualPrompt, on="prompt", on_fail="exception")
-
-    res = guard(
-        openai_client.chat.completions.create,
-        prompt=the_prompt,
-        model=f"azure/{config.AZURE_DEPLOYMENT}",
+def validate_input(the_prompt: str):
+    print("Validating input")
+    guard = Guard().use_many(
+        ToxicLanguage(
+            threshold=0.5, validation_method="sentence", on_fail=OnFailAction.EXCEPTION
+        ),
+        DetectPII(["EMAIL_ADDRESS", "PHONE_NUMBER"], on_fail=OnFailAction.EXCEPTION),
+        # UnusualPrompt(on="prompt", on_fail="exception"),
     )
-    return the_prompt
 
-
-def validate_pii(prompt: str):
     try:
-        guard_pii = Guard().use(
-            DetectPII, ["EMAIL_ADDRESS", "PHONE_NUMBER"], "exception"
-        )
-        guard_pii.validate(prompt)
-        return True, prompt
+        guard.validate(the_prompt)
+        return True, the_prompt
     except Exception as e:
         print(e)
         return False, str(e)
+
+
+# def validate_unusual_prompt(the_prompt: str):
+#     print("Validating unusual prompt")
+#     guard = Guard().use(UnusualPrompt, on="prompt", on_fail="exception")
+
+#     res = guard(
+#         openai_client.chat.completions.create,
+#         prompt=the_prompt,
+#         model=f"azure/{config.AZURE_DEPLOYMENT}",
+#     )
+#     return the_prompt
